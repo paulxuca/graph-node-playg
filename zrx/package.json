@@ -1,0 +1,16 @@
+{
+  "name": "zrx",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.4.1",
+    "@graphprotocol/graph-ts": "^0.4.2"
+  },
+  "scripts": {
+    "codegen": "graph codegen --output-dir types/",
+    "build": "graph build",
+    "build-ipfs": "graph build --ipfs /ip4/127.0.0.1/tcp/5001",
+    "deploy": "graph deploy --debug --ipfs /ip4/127.0.0.1/tcp/5001 --node http://127.0.0.1:8020/ -n zrx subgraph.yaml"
+  }
+}
