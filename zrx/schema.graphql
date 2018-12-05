@@ -11,9 +11,10 @@ type TokenContract @entity {
 
 type Token @entity {
   id: ID
+  tokenId: BigInt
   tokenContractAddress: Bytes
   tokenContract: TokenContract
-  transactions: [Transaction!] @derivedFrom(field: "token")
+  transactions: [Transaction!]
   owner: User
   ownerAddress: Bytes
 }
@@ -27,7 +28,6 @@ type TokenContractUser @entity {
   tokens: [Token!]
 }
 
-# TODO: Also add senderId and receiverId since graph-node doesn't allow querying along relations
 type Transaction @entity {
   id: ID!
   sender: User
@@ -40,6 +40,5 @@ type Transaction @entity {
   gasPrice: BigInt
   gasLimit: BigInt
 
-  # This lists a token without listign WHO specifically owns it.
   token: Token # Does this even need to be a field?
 }

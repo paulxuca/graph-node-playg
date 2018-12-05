@@ -56,14 +56,22 @@ export function transferHandler(event: TransferEvent): void {
   if (!tokenEntity) {
     tokenEntity = new Token();
 
-    tokenEntity.id = tokenId.toString();
+    let tokenEntityId = concat(tokenId, tokenContract._address).toHex();
+
+    tokenEntity.id = tokenEntityId;
+
+    tokenEntity.tokenId = tokenId;
     tokenEntity.tokenContractAddress = tokenContractEntity.address;
     tokenEntity.tokenContract = tokenContractEntity.id;
+    tokenEntity.transactions = [];
   }
 
   // Update owner of token.
   tokenEntity.owner = toUser.id;
   tokenEntity.ownerAddress = toUser.address;
+
+  // Add the transaction to the list of transactions on this token.
+  tokenEntity.transactions.push(event.transaction.hash.toHex());
 
   store.set("Token", tokenEntity.id, tokenEntity);
 
