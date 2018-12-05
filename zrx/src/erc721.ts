@@ -78,12 +78,10 @@ function createTokenForTransferEvent(
   // Create a token transaction entity
   let tokenTransaction = new TokenTransaction();
 
-  let tokenTransactionId = concat(
+  tokenTransaction.id = concat(
     tokenId as ByteArray,
     event.transaction.hash as ByteArray
   ).toHex();
-
-  tokenTransaction.id = tokenTransactionId;
 
   tokenTransaction.token = tokenEntityId;
   tokenTransaction.tokenId = tokenId;
@@ -110,7 +108,7 @@ function createTokenForTransferEvent(
   tokenEntity.owner = toAddress.toHex();
   tokenEntity.ownerAddress = toAddress;
 
-  store.set("TokenTransaction", tokenTransactionId, tokenTransaction);
+  store.set("TokenTransaction", tokenTransaction.id, tokenTransaction);
   store.set("Token", tokenEntityId, tokenEntity);
 
   return tokenEntity;
