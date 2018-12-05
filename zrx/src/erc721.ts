@@ -6,30 +6,37 @@ import {
   Transaction,
   TokenContract,
   Token,
-  TokenContractUser
+  TokenContractUser,
+  TokenTransaction
 } from "../types/schema";
 import { store, ByteArray, Bytes } from "@graphprotocol/graph-ts";
 
-export function transferHandler(event: TransferEvent): void {
-  // Init event params
+function createTransactionForTransferEvent(event: TransferEvent): Transaction {
+  let transaction = new Transaction();
+
   let fromAddress = event.params.from;
   let toAddress = event.params.to;
-  let tokenId = event.params.tokenId;
 
-  // Init constants
+  transaction.id = event.transaction.hash.toHex();
+  transaction.sender = toAddress.toHex();
+  transaction.senderAddress = fromAddress;
+
+  transaction.receiver = toAddress.toHex();
+  transaction.receiverAddress = toAddress;
+
+  transaction.gasUsed = event.transaction.gasUsed;
+  transaction.gasPrice = event.transaction.gasPrice;
+  transaction.gasLimit = event.block.gasLimit;
+
+  store.set("Transaction", transaction.id, transaction);
+
+  return transaction;
+}
+
+function createTokenContractForTransferEvent(
+  event: TransferEvent
+): TokenContract {
   let tokenContract = ERC721.bind(event.address);
-
-  let fromUser = (store.get("User", fromAddress.toHex()) as User) || new User();
-  let toUser = (store.get("User", toAddress.toHex()) as User) || new User();
-
-  fromUser.address = fromAddress;
-  fromUser.id = fromAddress.toHex();
-
-  toUser.address = toAddress;
-  toUser.id = toAddress.toHex();
-
-  store.set("User", fromUser.address.toHex(), fromUser);
-  store.set("User", toUser.address.toHex(), toUser);
 
   let tokenContractEntity = store.get(
     "TokenContract",
@@ -50,35 +57,94 @@ export function transferHandler(event: TransferEvent): void {
     );
   }
 
+  return tokenContractEntity;
+}
+
+function createTokenForTransferEvent(
+  event: TransferEvent,
+  tokenContract: TokenContract,
+  transaction: Transaction
+): Token {
+  let toAddress = event.params.to;
+  let tokenId = event.params.tokenId;
+
   let tokenEntity = store.get("Token", tokenId.toString()) as Token;
+
+  let tokenEntityId = concat(
+    tokenId as ByteArray,
+    tokenContract.address as ByteArray
+  ).toHex();
+
+  // Create a token transaction entity
+  let tokenTransaction = new TokenTransaction();
+
+  let tokenTransactionId = concat(
+    tokenId as ByteArray,
+    event.transaction.hash as ByteArray
+  ).toHex();
+
+  tokenTransaction.id = tokenTransactionId;
+
+  tokenTransaction.token = tokenEntityId;
+  tokenTransaction.tokenId = tokenId;
+
+  tokenTransaction.transaction = transaction.id;
+  tokenTransaction.transactionId = transaction.id;
 
   // Creates Token if not exists.
   if (!tokenEntity) {
     tokenEntity = new Token();
 
-    let tokenEntityId = concat(tokenId, tokenContract._address).toHex();
-
     tokenEntity.id = tokenEntityId;
-
     tokenEntity.tokenId = tokenId;
-    tokenEntity.tokenContractAddress = tokenContractEntity.address;
-    tokenEntity.tokenContract = tokenContractEntity.id;
-    tokenEntity.transactions = [];
+    tokenEntity.tokenContractAddress = tokenContract.address;
+    tokenEntity.tokenContract = tokenContract.id;
+    tokenEntity.tokenTransactions = [];
   }
 
-  // Update owner of token.
-  tokenEntity.owner = toUser.id;
-  tokenEntity.ownerAddress = toUser.address;
+  tokenEntity.tokenTransactions = pushStringToArray(
+    tokenEntity.tokenTransactions as Array<string>,
+    tokenTransaction.id
+  );
 
-  // Add the transaction to the list of transactions on this token.
-  tokenEntity.transactions.push(event.transaction.hash.toHex());
+  tokenEntity.owner = toAddress.toHex();
+  tokenEntity.ownerAddress = toAddress;
 
-  store.set("Token", tokenEntity.id, tokenEntity);
+  store.set("TokenTransaction", tokenTransactionId, tokenTransaction);
+  store.set("Token", tokenEntityId, tokenEntity);
+
+  return tokenEntity;
+}
+
+export function transferHandler(event: TransferEvent): void {
+  // Init event params
+  let fromAddress = event.params.from;
+  let toAddress = event.params.to;
+
+  let fromUser = (store.get("User", fromAddress.toHex()) as User) || new User();
+  let toUser = (store.get("User", toAddress.toHex()) as User) || new User();
+
+  fromUser.address = fromAddress;
+  fromUser.id = fromAddress.toHex();
+
+  toUser.address = toAddress;
+  toUser.id = toAddress.toHex();
+
+  store.set("User", fromUser.address.toHex(), fromUser);
+  store.set("User", toUser.address.toHex(), toUser);
+
+  let transactionEntity = createTransactionForTransferEvent(event);
+  let tokenContractEntity = createTokenContractForTransferEvent(event);
+  let tokenEntity = createTokenForTransferEvent(
+    event,
+    tokenContractEntity,
+    transactionEntity
+  );
 
   // Manage TokenContractUser here.
   // The TokenContractUser is a concat of token contract address + user address
   let toUserTokenContractUserId = concat(
-    tokenContract._address,
+    tokenContractEntity.address as ByteArray,
     toUser.address as Bytes
   ).toHex();
 
@@ -92,21 +158,30 @@ export function transferHandler(event: TransferEvent): void {
 
     toUserTokenContractUser.tokens = [tokenEntity.id];
     toUserTokenContractUser.id = toUserTokenContractUserId;
-    toUserTokenContractUser.tokenContract = tokenContractEntity.id;
-    toUserTokenContractUser.user = toUser.id;
+    // FIX
+    // toUserTokenContractUser.tokenContract = tokenContractEntity.id;
+    toUserTokenContractUser.tokenContract = tokenContractEntity.address.toHex();
+
+    // FIX
+    // toUserTokenContractUser.user = toUser.id;
+    toUserTokenContractUser.user = toUser.address.toHex();
+
     toUserTokenContractUser.userAddress = toUser.address;
   } else {
-    toUserTokenContractUser.tokens.push(tokenEntity.id);
+    toUserTokenContractUser.tokens = pushStringToArray(
+      toUserTokenContractUser.tokens as Array<string>,
+      tokenEntity.id
+    );
   }
 
   store.set(
     "TokenContractUser",
-    toUserTokenContractUser.id,
+    toUserTokenContractUserId,
     toUserTokenContractUser
   );
 
   let fromUserTokenContractUserId = concat(
-    tokenContract._address,
+    tokenContractEntity.address as ByteArray,
     fromUser.address as Bytes
   ).toHex();
 
@@ -118,55 +193,50 @@ export function transferHandler(event: TransferEvent): void {
   // Assume all events are synced on chain in order.
   // Only care about removing this record if it's safe to remove.
   if (fromUserTokenContractUser) {
-    fromUserTokenContractUser.tokens = fromUserTokenContractUser.tokens || [];
+    fromUserTokenContractUser.tokens = fromUserTokenContractUser.tokens as Array<
+      string
+    >;
 
     fromUserTokenContractUser.tokens = removeStringFromArray(
-      fromUserTokenContractUser.tokens,
+      fromUserTokenContractUser.tokens as Array<string>,
       tokenEntity.id
     );
 
     if (fromUserTokenContractUser.tokens.length === 0) {
-      store.remove("TokenContractUser", fromUserTokenContractUser.id);
+      store.remove("TokenContractUser", fromUserTokenContractUserId);
     } else {
       store.set(
         "TokenContractUser",
-        fromUserTokenContractUser.id,
+        fromUserTokenContractUserId,
         fromUserTokenContractUser
       );
     }
   }
-
-  // Handle transaction.
-  let transaction = new Transaction();
-
-  transaction.id = event.transaction.hash.toHex();
-  transaction.sender = fromUser.id;
-  transaction.senderAddress = fromUser.address;
-
-  transaction.receiver = toUser.id;
-  transaction.receiverAddress = toUser.address;
-
-  transaction.token = tokenId.toString();
-  transaction.gasUsed = event.transaction.gasUsed;
-  transaction.gasPrice = event.transaction.gasPrice;
-  transaction.gasLimit = event.block.gasLimit;
-
-  store.set("Transaction", transaction.id, transaction);
 }
 
-function removeStringFromArray(
-  array: string[] | null,
-  element: string
-): string[] {
-  if (!array) {
-    return [];
+// Helpers
+function removeStringFromArray(array: string[], element: string): string[] {
+  let outArray = new Array<string>();
+
+  for (let i = 0; i < array.length; i++) {
+    if (element !== array[i]) {
+      outArray[i] = array[i];
+    }
   }
 
-  let index = array.indexOf(element);
+  return outArray;
+}
 
-  array.splice(index, 1);
+function pushStringToArray(array: string[], element: string): string[] {
+  let outArray = new Array<string>(array.length + 1);
 
-  return array as string[];
+  for (let i = 0; i < array.length; i++) {
+    outArray[i] = array[i];
+  }
+
+  outArray[array.length] = element;
+
+  return outArray;
 }
 
 // Helper for concatenating two byte arrays

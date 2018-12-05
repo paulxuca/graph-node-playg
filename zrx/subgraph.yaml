@@ -3,7 +3,7 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum/contract
-    name: Cryptokitties
+    name: ERC721
     source:
       address: "0x06012c8cf97bead5deae237070f9587f8e7a266d" # Cryptokitties on the MainNet
       abi: ERC721

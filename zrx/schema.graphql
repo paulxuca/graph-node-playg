@@ -14,7 +14,7 @@ type Token @entity {
   tokenId: BigInt
   tokenContractAddress: Bytes
   tokenContract: TokenContract
-  transactions: [Transaction!]
+  tokenTransactions: [TokenTransaction!] @derivedFrom(field: "token")
   owner: User
   ownerAddress: Bytes
 }
@@ -28,8 +28,16 @@ type TokenContractUser @entity {
   tokens: [Token!]
 }
 
+type TokenTransaction @entity {
+  id: ID # tokenId + TransactionId
+  token: Token
+  tokenId: BigInt
+  transaction: Transaction
+  transactionId: ID
+}
+
 type Transaction @entity {
-  id: ID!
+  id: ID
   sender: User
   senderAddress: Bytes
 
@@ -40,5 +48,5 @@ type Transaction @entity {
   gasPrice: BigInt
   gasLimit: BigInt
 
-  token: Token # Does this even need to be a field?
+  tokenTransactions: TokenTransaction @derivedFrom(field: "transaction")
 }
