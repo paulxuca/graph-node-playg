@@ -1,5 +1,45 @@
 type User @entity {
+  id: ID
+  address: Bytes
+  tokenContracts: [TokenContractUser!] @derivedFrom(field: "user")
+}
+
+type TokenContract @entity {
+  id: ID
+  address: Bytes
+}
+
+type Token @entity {
+  id: ID
+  tokenContractAddress: Bytes
+  tokenContract: TokenContract
+  transactions: [Transaction!] @derivedFrom(field: "token")
+  owner: User
+  ownerAddress: Bytes
+}
+
+# Represents owned tokens by user
+type TokenContractUser @entity {
+  id: ID
+  tokenContract: TokenContract
+  user: User
+  userAddress: Bytes
+  tokens: [Token!]
+}
+
+# TODO: Also add senderId and receiverId since graph-node doesn't allow querying along relations
+type Transaction @entity {
   id: ID!
-  address: Bytes!
-  balance: BigInt!
+  sender: User
+  senderAddress: Bytes
+
+  receiver: User
+  receiverAddress: Bytes
+
+  gasUsed: BigInt
+  gasPrice: BigInt
+  gasLimit: BigInt
+
+  # This lists a token without listign WHO specifically owns it.
+  token: Token # Does this even need to be a field?
 }

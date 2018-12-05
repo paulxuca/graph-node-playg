@@ -3,20 +3,38 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum/contract
-    name: ERC20
+    name: Cryptokitties
     source:
-      address: "0xe41d2489571d322189246dafa5ebde1f4699f498" # Mainnet
-      abi: ERC20
+      address: "0x06012c8cf97bead5deae237070f9587f8e7a266d" # Cryptokitties on the MainNet
+      abi: ERC721
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.1
       language: wasm/assemblyscript
-      file: ./src/erc20.ts
+      file: ./src/erc721.ts
       abis:
-        - name: ERC20
-          file: ./abis/ERC20.json
+        - name: ERC721
+          file: ./abis/ERC721.json
       entities:
         - Transfer
       eventHandlers:
         - event: Transfer(address,address,uint256)
           handler: transferHandler
+  # - kind: ethereum/contract
+  #   name: Cryptopunks
+  #   source:
+  #     address: "0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb" # CryptoPunks on the MainNet
+  #     abi: ERC721_indexed
+  #   mapping:
+  #     kind: ethereum/events
+  #     apiVersion: 0.0.1
+  #     language: wasm/assemblyscript
+  #     file: ./src/erc721.ts
+  #     abis:
+  #       - name: ERC721_indexed
+  #         file: ./abis/ERC721_indexed.json
+  #     entities:
+  #       - Transfer
+  #     eventHandlers:
+  #       - event: Transfer(address,address,uint256)
+  #         handler: transferHandler
